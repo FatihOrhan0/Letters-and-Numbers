@@ -4,10 +4,17 @@
 #include <unordered_map>
 #include <vector>
 #include <climits>
+#include <cfloat>
 
-std::pair<int, int> get_pair(int num, int base){
+std::pair<int, int> get_pair(int num, int base) {
     return std::make_pair(num / base, 
       num % base >= num / base ? num % base + 1 : num % base);
+}
+
+//this is only because the c++ version I use has issues with precision on the default abs function
+double abs(double d) { 
+  if (d >= 0) return d;
+  return -1 * d;
 }
 
 std::vector<std::pair<int, int> > find_seq(int num) {
@@ -25,14 +32,16 @@ std::vector<std::pair<int, int> > find_seq(int num) {
   num -= fourth * 2;
   int fifth = num % 2;
   std::pair<int, int> p5 = get_pair(fifth, 1);
-  return {p1, p2, p3, p4, p5};
+  return { p1, p2, p3, p4, p5 };
 }
 
 std::vector<int> extract_bits(int number) {
     std::vector<int> result;
-    for (int i = 0; i < 5; ++i) {
-        int bit = (number >> i) & 0b11; 
-        result.push_back(bit);
+    int divisor = 256;
+    while (number >= 0 && result.size() < 5) { 
+      result.push_back(number / divisor);
+      number -= divisor * result.back();
+      divisor /= 4;
     }
     return result;
 }
@@ -42,43 +51,42 @@ int main() {
   for (int i = 0; i < 86400; i++) { 
     sequences[i] = find_seq(i);
   }
-  std::vector<std::vector<int> > operators_list(256 * 64);
-  for (int i = 0; i < 64 * 256; i++) { 
+  std::vector<std::vector<int> > operators_list(1024);
+  for (int i = 0; i < 1024; i++) { 
     operators_list[i] = extract_bits(i);
   }
-  std::vector<int> numbers = {25, 100, 2, 3, 7, 9};
-  int target = 733, closest_diff = INT_MAX, closest_maker = 0, closest_operators = 0; 
+  std::vector<double> numbers = {100, 25, 2, 5, 7, 75};
+  double target = 35800000000, closest_diff = DBL_MAX, closest_maker = 0, closest_operators = 0; 
 
   for (int i = 0; i < 86400; i++) {
-    if (i % 1000 == 0) std::cout << i / 1000 << std::endl;
+    // if (i % 1000 == 0) std::cout << i / 1000 << std::endl;
     auto v = sequences[i];
-    for (int k = 0; k < 256 * 64; k++) { 
+    for (int k = 0; k < 1024; k++) { 
       auto operators = operators_list[k];
-      std::vector<int> temp = numbers; 
+      std::vector<double> temp = numbers; 
       for (int j = 0; j < 5; j++) { 
-        int new_num;
+        double new_num;
         if (operators[j] == 0) { 
           new_num = temp[v[j].first] + temp[v[j].second]; 
         }
         else if (operators[j] == 1) { 
-          new_num = temp[v[j].first] - temp[v[j].second]; 
+          new_num = temp[v[j].first] * temp[v[j].second]; 
         }
         else if (operators[j] == 2) { 
-          new_num = temp[v[j].first] * temp[v[j].second]; 
+          new_num = temp[v[j].first] - temp[v[j].second]; 
         }
         else { 
           if (temp[v[j].second] == 0) break;
           new_num = temp[v[j].first] / temp[v[j].second]; 
         }
-        temp.erase(temp.begin() + std::max(v[j].first, v[j].second));
-        temp.erase(temp.begin() + std::min(v[j].first, v[j].second));
-        temp.push_back(new_num); 
+        temp.erase(temp.begin() + std::max(v[j].first, v[j].second)); 
+        temp[std::min(v[j].first, v[j].second)] = new_num;
 
         if (abs(target - new_num) < closest_diff) { 
           closest_diff = abs(target - new_num);
           closest_maker = i;
           closest_operators = k;
-          if (closest_diff == 0) { 
+          if (closest_diff == 0.0) { 
             goto exact;
           }
         }
@@ -90,27 +98,26 @@ int main() {
     auto v = find_seq(closest_maker);
     auto operators = extract_bits(closest_operators);
     for (int j = 0; j < 5; j++) { 
-      int new_num;
+      double new_num;
       if (operators[j] == 0) { 
         new_num = numbers[v[j].first] + numbers[v[j].second]; 
         std::cout << numbers[v[j].first] << '+' << numbers[v[j].second] << '=' << new_num << std::endl;
       }
       else if (operators[j] == 1) { 
-        new_num = numbers[v[j].first] - numbers[v[j].second]; 
-        std::cout << numbers[v[j].first] << '-' << numbers[v[j].second] << '=' << new_num << std::endl;
-      }
-      else if (operators[j] == 2) { 
         new_num = numbers[v[j].first] * numbers[v[j].second]; 
         std::cout << numbers[v[j].first] << '*' << numbers[v[j].second] << '=' << new_num << std::endl;
+      }
+      else if (operators[j] == 2) { 
+        new_num = numbers[v[j].first] - numbers[v[j].second]; 
+        std::cout << numbers[v[j].first] << '-' << numbers[v[j].second] << '=' << new_num << std::endl;
       }
       else { 
         if (numbers[v[j].second] == 0) break;
         new_num = numbers[v[j].first] / numbers[v[j].second]; 
         std::cout << numbers[v[j].first] << '/' << numbers[v[j].second] << '=' << new_num << std::endl;
       }
-      numbers.erase(numbers.begin() + std::max(v[j].first, v[j].second));
-      numbers.erase(numbers.begin() + std::min(v[j].first, v[j].second));
-      numbers.push_back(new_num); 
+      numbers.erase(numbers.begin() + std::max(v[j].first, v[j].second)); 
+      numbers[std::min(v[j].first, v[j].second)] = new_num;
       if (abs(new_num - target) == closest_diff) return 1;  
     }
     return 1; 
